@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>LINE 打卡系統</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      width: 90%;
+      max-width: 300px;
+      padding: 20px;
+      font-size: 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 10px;
+      color: white;
+    }
+
+    #checkInBtn {
+      background-color: #4CAF50;
+    }
+
+    #checkOutBtn {
+      background-color: #f44336;
+    }
+
+    pre {
+      text-align: left;
+      background: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<h1 style="font-size: 26px; font-weight: bold;">
+  <span style="color: #FFD700;">⚡</span> 明順電氣打卡系統
+</h1>
+
+  <button id="checkInBtn" disabled>上班打卡</button>
+  <button id="checkOutBtn" disabled>下班打卡</button>
+
+  <pre id="status">LIFF 初始化中...</pre>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwffhf5ZXzgtPZoPJuSTAOBHngYT4Ue7M-gVdaViMnLktdgsF2boaXI97469QYAS41L/exec";
+    const LIFF_ID = "2009546112-CA100Nfj";
+
+    let currentUserId = "";
+
+    async function initApp() {
+      const statusEl = document.getElementById("status");
+
+      try {
+        await liff.init({ liffId: LIFF_ID });
+
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+        currentUserId = profile.userId;
+
+        statusEl.innerText = "✅ 初始化成功\nUserID: " + currentUserId;
+
+        document.getElementById("checkInBtn").disabled = false;
+        document.getElementById("checkOutBtn").disabled = false;
+
+      } catch (err) {
+        statusEl.innerText = "❌ 初始化失敗\n" + err;
+      }
+    }
+
+    function sendAttendance(type) {
+      const statusEl = document.getElementById("status");
+
+      statusEl.innerText = "📡 取得GPS中...";
+
+      navigator.geolocation.getCurrentPosition(async function(position) {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+
+        const params = new URLSearchParams({
+          userId: currentUserId,
+          type: type,
+          latitude: lat,
+          longitude: lng,
+          accuracy: accuracy
+        });
+
+        const url = GAS_URL + "?" + params.toString();
+
+        try {
+          const res = await fetch(url);
+          const text = (await res.text()).trim();
+
+          if (text === "OK") {
+            statusEl.innerText = "✅ 打卡成功\n" + type;
+          } else if (text === "重複打卡") {
+            statusEl.innerText = "⚠️ 重複打卡";
+          } else {
+            statusEl.innerText = "❌ " + text;
+          }
+
+        } catch (err) {
+          statusEl.innerText = "❌ 連線失敗";
+        }
+      });
+    }
+
+    document.getElementById("checkInBtn").onclick = () => sendAttendance("上班");
+    document.getElementById("checkOutBtn").onclick = () => sendAttendance("下班");
+
+    initApp();
+  </script>
+</body>
+</html>
